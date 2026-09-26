@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>QR Attendance Scanner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --green: #1a7f3c;
+    --green-dark: #145c2c;
+    --green-light: #e8f7ee;
+    --red: #c0392b;
+    --gray: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--green-light);
+    color: #1f2937;
+    min-height: 100vh;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-bottom: 40px;
+  }
+  header {
+    background: var(--green);
+    color: #fff;
+    padding: 18px 16px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e5f3ec;
+  }
+  .stats-row {
+    display: flex;
+    gap: 12px;
+  }
+  .stat-box {
+    flex: 1;
+    background: var(--green-light);
+    border: 1px solid #cdeedb;
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-box .num {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--green-dark);
+  }
+  .stat-box .label {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 2px;
+  }
+  #reader {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+  }
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  button:active { opacity: 0.85; }
+  .btn-start {
+    background: var(--green);
+    color: #fff;
+  }
+  .btn-stop {
+    background: #fff;
+    color: var(--red);
+    border: 2px solid var(--red);
+    margin-top: 10px;
+  }
+  .hidden { display: none !important; }
+  .result-box {
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 4px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .result-success {
+    background: var(--green-light);
+    border: 1px solid var(--green);
+    color: var(--green-dark);
+  }
+  .result-error {
+    background: #fdecea;
+    border: 1px solid var(--red);
+    color: var(--red);
+  }
+  .result-warning {
+    background: #fff8e6;
+    border: 1px solid #d4a017;
+    color: #7a5b00;
+  }
+  .result-title {
+    font-weight: 800;
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  .result-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+  .result-line span:first-child {
+    color: var(--gray);
+  }
+  .loading {
+    text-align: center;
+    color: var(--gray);
+    font-size: 14px;
+    padding: 10px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #cdeedb;
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>✅ QR Attendance Scanner</h1>
+    <p>Scan participant badges to check them in</p>
+  </header>
+
+  <div class="card">
+    <div class="section-title">Live Statistics</div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="num" id="registeredCount">--</div>
+        <div class="label">Registered</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="checkedInCount">--</div>
+        <div class="label">Checked In</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Scanner</div>
+    <div id="reader" class="hidden"></div>
+    <button id="startBtn" class="btn-start">▶ Start QR Scanner</button>
+    <button id="stopBtn" class="btn-stop hidden">■ Stop Scanner</button>
+  </div>
+
+  <div class="card" id="resultCard">
+    <div class="section-title">Scan Result</div>
+    <div id="resultContent" class="result-box" style="background:#f3f4f6;border:1px solid #e5e7eb;color:var(--gray);">
+      No scan yet. Press "Start QR Scanner" and point the camera at a QR code.
+    </div>
+  </div>
+</div>
+
+<script>
+const PIN = "0137";
+const API_URL = "https://script.google.com/macros/s/AKfycbwEJ8BpTTigG7jV3gVOrkLjdpFgYhDksF8tn3Q4lPlINdE0rQyw4t7j5_Ybo4WY_A0b/exec";
+
+let html5QrCode = null;
+let isProcessing = false;
+let jsonpCounter = 0;
+
+// ---------- JSONP helper ----------
+function jsonpRequest(params) {
+  return new Promise((resolve, reject) => {
+    const callbackName = "jsonpCb_" + Date.now() + "_" + (jsonpCounter++);
+    const script = document.createElement("script");
+
+    const cleanup = () => {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    window[callbackName] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("JSONP request failed"));
+    };
+
+    const query = Object.assign({}, params, { callback: callbackName });
+    const queryString = Object.keys(query)
+      .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(query[k]))
+      .join("&");
+
+    script.src = API_URL + "?" + queryString;
+    document.body.appendChild(script);
+
+    setTimeout(() => {
+      if (window[callbackName]) {
+        cleanup();
+        reject(new Error("Request timed out"));
+      }
+    }, 15000);
+  });
+}
+
+// ---------- Stats ----------
+async function loadStats() {
+  try {
+    const data = await jsonpRequest({ action: "stats", pin: PIN });
+    if (data && data.success !== false) {
+      document.getElementById("registeredCount").textContent =
+        data.registered !== undefined ? data.registered : "--";
+      document.getElementById("checkedInCount").textContent =
+        data.checkedIn !== undefined ? data.checkedIn : "--";
+    }
+  } catch (e) {
+    console.error("Failed to load stats:", e);
+  }
+}
+
+// ---------- Result rendering ----------
+function renderResult(type, title, lines) {
+  const box = document.getElementById("resultContent");
+  box.className = "result-box " + (
+    type === "success" ? "result-success" :
+    type === "warning" ? "result-warning" :
+    type === "error" ? "result-error" : ""
+  );
+  let html = '<div class="result-title">' + title + '</div>';
+  lines.forEach(line => {
+    html += '<div class="result-line"><span>' + line.label + '</span><span>' + line.value + '</span></div>';
+  });
+  box.innerHTML = html;
+}
+
+function renderLoading(id) {
+  const box = document.getElementById("resultContent");
+  box.className = "result-box";
+  box.style.background = "#f3f4f6";
+  box.style.border = "1px solid #e5e7eb";
+  box.style.color = "var(--gray)";
+  box.innerHTML = '<span class="spinner"></span>Checking in <strong>' + id + '</strong>...';
+}
+
+// ---------- Check-in ----------
+async function checkIn(registrationId) {
+  renderLoading(registrationId);
+  try {
+    const data = await jsonpRequest({
+      action: "checkin",
+      id: registrationId,
+      pin: PIN
+    });
+
+    if (!data) {
+      renderResult("error", "❌ Invalid Response", [
+        { label: "Registration ID", value: registrationId }
+      ]);
+    } else if (data.success === false) {
+      if (data.status === "already_checked_in" || /already/i.test(data.message || "")) {
+        renderResult("warning", "⚠️ Already Checked In", [
+          { label: "Name", value: data.name || "—" },
+          { label: "Registration ID", value: registrationId }
+        ]);
+      } else if (data.status === "invalid" || /invalid|not found/i.test(data.message || "")) {
+        renderResult("error", "❌ Invalid Registration ID", [
+          { label: "Registration ID", value: registrationId }
+        ]);
+      } else {
+        renderResult("error", "❌ " + (data.message || "Check-in Failed"), [
+          { label: "Registration ID", value: registrationId }
+        ]);
+      }
+    } else {
+      renderResult("success", "✅ Checked In Successfully", [
+        { label: "Name", value: data.name || "—" },
+        { label: "Registration ID", value: registrationId }
+      ]);
+    }
+  } catch (e) {
+    renderResult("error", "❌ Network Error", [
+      { label: "Registration ID", value: registrationId },
+      { label: "Details", value: "Could not reach server" }
+    ]);
+  } finally {
+    loadStats();
+    isProcessing = false;
+  }
+}
+
+// ---------- Scanner ----------
+function onScanSuccess(decodedText) {
+  if (isProcessing) return;
+  isProcessing = true;
+
+  // Pause scanning temporarily while we process this result
+  if (html5QrCode) {
+    html5QrCode.pause(true);
+  }
+
+  checkIn(decodedText.trim()).finally(() => {
+    setTimeout(() => {
+      if (html5QrCode && html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+        html5QrCode.resume();
+      }
+      isProcessing = false;
+    }, 1500);
+  });
+}
+
+function onScanFailure() {
+  // ignore frame-by-frame scan failures
+}
+
+async function startScanner() {
+  const readerDiv = document.getElementById("reader");
+  readerDiv.classList.remove("hidden");
+  document.getElementById("startBtn").classList.add("hidden");
+  document.getElementById("stopBtn").classList.remove("hidden");
+
+  html5QrCode = new Html5Qrcode("reader");
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0
+  };
+
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      onScanFailure
+    );
+  } catch (err) {
+    alert("Unable to access camera: " + err);
+    stopScanner();
+  }
+}
+
+async function stopScanner() {
+  if (html5QrCode) {
+    try {
+      const state = html5QrCode.getState();
+      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+        await html5QrCode.stop();
+      }
+      await html5QrCode.clear();
+    } catch (e) {
+      console.warn("Error stopping scanner:", e);
+    }
+    html5QrCode = null;
+  }
+  document.getElementById("reader").classList.add("hidden");
+  document.getElementById("startBtn").classList.remove("hidden");
+  document.getElementById("stopBtn").classList.add("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", startScanner);
+document.getElementById("stopBtn").addEventListener("click", stopScanner);
+
+// Initial load
+loadStats();
+setInterval(loadStats, 15000);
+</script>
+
+</body>
+</html>
